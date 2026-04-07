@@ -1,0 +1,48 @@
+# vault-library-pipeline configuration
+# Edit keyword lists to match your library's subject areas.
+# All matches are case-insensitive substring checks on the PDF title.
+
+# ------------------------------------------------------------------
+# TYPE inference
+# Keys become the TYPE token in the filename (must be UPPER_ALPHA).
+# First matching key wins; PAPER is the built-in fallback.
+# ------------------------------------------------------------------
+type_keywords:
+  REVIEW:  ["review", "systematic review", "literature review", "meta-analysis"]
+  SURVEY:  ["survey"]
+  THESIS:  ["thesis", "dissertation", "mémoire"]
+  REPORT:  ["report", "technical report", "white paper"]
+  BOOK:    ["handbook", "textbook", "introduction to", "guide to"]
+  CONF:    ["proceedings", "workshop", "conference paper"]
+
+# ------------------------------------------------------------------
+# DOMAIN inference
+# Keys become the DOMAIN token in the filename (must be UPPER_ALPHA).
+# First matching key wins; META is the built-in fallback.
+# ------------------------------------------------------------------
+domain_keywords:
+  COMPUTE: ["algorithm", "machine learning", "deep learning",
+            "neural network", "recommendation", "nlp",
+            "computer vision", "ai", "artificial intelligence",
+            "transformer", "large language model", "llm"]
+  BIO:     ["biology", "genomics", "protein", "cell", "gene",
+            "bioinformatics", "neuroscience", "ecology"]
+  PHYSICS: ["quantum", "particle", "relativity", "thermodynamics",
+            "astrophysics", "optics", "mechanics"]
+  CHEM:    ["chemistry", "molecule", "reaction", "polymer", "catalyst"]
+  SOCIAL:  ["sociology", "psychology", "economics", "policy",
+            "political science", "anthropology", "education"]
+  HISTORY: ["history", "archive", "medieval", "ancient", "modern history"]
+  PHIL:    ["philosophy", "ethics", "epistemology", "ontology"]
+  MATH:    ["mathematics", "algebra", "topology", "statistics",
+            "probability", "calculus", "combinatorics"]
+
+# ------------------------------------------------------------------
+# Slugification
+# ------------------------------------------------------------------
+slug_word_limit: 6   # Max words used from the title in the filename slug
+
+# ------------------------------------------------------------------
+# Watch mode
+# ------------------------------------------------------------------
+watch_interval_seconds: 10   # How often (seconds) to poll input_pdfs/
