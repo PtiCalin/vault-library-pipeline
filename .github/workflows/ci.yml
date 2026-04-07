@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "library_pipeline/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "library_pipeline/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  lint-and-validate:
+    name: Lint & syntax check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r library_pipeline/requirements.txt
+          pip install flake8
+
+      - name: Syntax check (ast)
+        run: |
+          python -c "
+          import ast, pathlib, sys
+          errors = []
+          for f in pathlib.Path('library_pipeline').glob('**/*.py'):
+              try:
+                  ast.parse(f.read_text())
+              except SyntaxError as e:
+                  errors.append(f'{f}: {e}')
+          if errors:
+              print('\n'.join(errors)); sys.exit(1)
+          print('All Python files pass syntax check.')
+          "
+
+      - name: Flake8 lint
+        run: |
+          flake8 library_pipeline/ \
+            --max-line-length=100 \
+            --extend-ignore=E203,W503 \
+            --exclude=library_pipeline/input_pdfs,library_pipeline/processed,library_pipeline/metadata,library_pipeline/exports
+
+      - name: Validate config.yaml
+        run: |
+          python -c "
+          import yaml, pathlib, sys
+          cfg_path = pathlib.Path('library_pipeline/config.yaml')
+          if cfg_path.exists():
+              cfg = yaml.safe_load(cfg_path.read_text())
+              for section in ('type_keywords', 'domain_keywords'):
+                  if section not in cfg:
+                      print(f'WARNING: {section} missing from config.yaml')
+              print('config.yaml valid.')
+          else:
+              print('config.yaml not found — skipped.')
+          "

@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a new feature or improvement.
+title: "[feat] <short description>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose a new feature or improvement.
+        Check the [ROADMAP](../../ROADMAP.md) first — it may already be planned.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target component
+      options:
+        - cli.py (core engine)
+        - export_to_obsidian.py
+        - config.yaml / inference rules
+        - Zotero integration
+        - Obsidian templates
+        - GitHub Actions / CI
+        - Documentation
+        - New component
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What limitation or gap does this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature. Include a code sketch if helpful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider?
+
+  - type: dropdown
+    id: roadmap
+    attributes:
+      label: Is this on the ROADMAP?
+      options:
+        - "Yes — v2"
+        - "Yes — v3"
+        - "Yes — v4"
+        - "Yes — Future ideas"
+        - "No — new proposal"
+    validations:
+      required: true
