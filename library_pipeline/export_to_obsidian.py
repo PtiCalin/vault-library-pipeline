@@ -15,9 +15,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("obsidian-export")
 
 BASE_DIR      = Path(__file__).parent
-META_DIR      = BASE_DIR / "metadata"
-EXPORTS_DIR   = BASE_DIR / "exports"
-TEMPLATE_FILE = BASE_DIR / "templates" / "obsidian-note-template.md"
+META_DIR      = BASE_DIR / "03_metadata"
+EXPORTS_DIR   = BASE_DIR / "04_exports"
+TEMPLATE_FILE = BASE_DIR / "00_templates" / "obsidian-note-template.md"
 
 
 def load_template() -> str:

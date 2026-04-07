@@ -32,10 +32,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Paths (resolved relative to this file so the CLI works from any cwd)
 # ---------------------------------------------------------------------------
-BASE_DIR   = Path(__file__).parent
-INPUT_DIR  = BASE_DIR / "input_pdfs"
-OUTPUT_DIR = BASE_DIR / "processed"
-META_DIR   = BASE_DIR / "metadata"
+BASE_DIR    = Path(__file__).parent
+INPUT_DIR   = BASE_DIR / "01_input_pdfs"
+OUTPUT_DIR  = BASE_DIR / "02_processed"
+META_DIR    = BASE_DIR / "03_metadata"
 CONFIG_FILE = BASE_DIR / "config.yaml"
 
 # ---------------------------------------------------------------------------
@@ -54,21 +54,62 @@ def load_config() -> dict:
     """Load config.yaml if available; fall back to safe defaults."""
     defaults = {
         "type_keywords": {
-            "REVIEW":   ["review", "systematic review", "literature review"],
-            "SURVEY":   ["survey"],
-            "THESIS":   ["thesis", "dissertation"],
-            "REPORT":   ["report", "technical report"],
-            "PAPER":    [],           # catch-all
+            "REVIEW":       ["review", "systematic review", "literature review"],
+            "SURVEY":       ["survey"],
+            "META":         ["meta-analysis"],
+            "THESIS":       ["thesis"],
+            "DISSERTATION": ["dissertation", "doctoral"],
+            "PREPRINT":     ["preprint", "arxiv"],
+            "PROCEEDING":   ["proceedings", "conference paper"],
+            "POSTER":       ["poster"],
+            "TALK":         ["presentation", "slide deck"],
+            "BOOK":         ["handbook", "textbook", "introduction to"],
+            "CHAPTER":      ["chapter"],
+            "MONOGRAPH":    ["monograph"],
+            "REPORT":       ["report", "technical report"],
+            "WHITEPAPER":   ["white paper", "whitepaper"],
+            "STANDARD":     ["iso", "rfc", "w3c"],
+            "SPEC":         ["specification"],
+            "DOC":          ["documentation"],
+            "TUTORIAL":     ["tutorial"],
+            "GUIDE":        ["guide", "how to"],
+            "COURSE":       ["course", "lecture notes"],
+            "NOTE":         ["notes"],
+            "DATASET":      ["dataset"],
+            "BENCHMARK":    ["benchmark"],
+            "CODE":         ["implementation"],
+            "MODEL":        ["model architecture"],
+            "ARTICLE":      ["magazine article"],
+            "BLOG":         ["blog"],
+            "NEWS":         ["news"],
+            "INTERVIEW":    ["interview"],
+            "POLICY":       ["policy"],
+            "LAW":          ["legal text"],
+            "REGULATION":   ["regulation"],
+            "PAPER":        [],
         },
         "domain_keywords": {
-            "COMPUTE":  ["algorithm", "machine learning", "deep learning",
-                         "neural network", "recommendation", "nlp",
-                         "computer vision", "ai", "artificial intelligence"],
-            "BIO":      ["biology", "genomics", "protein", "cell", "gene"],
-            "PHYSICS":  ["quantum", "particle", "relativity", "thermodynamics"],
-            "SOCIAL":   ["sociology", "psychology", "economics", "policy"],
-            "HISTORY":  ["history", "archive", "medieval", "ancient"],
-            "META":     [],           # catch-all
+            "FORMAL":      ["mathematics", "logic", "statistics", "optimization",
+                            "algebra", "topology", "probability", "calculus"],
+            "COMPUTE":     ["algorithm", "machine learning", "deep learning",
+                            "neural network", "recommendation", "nlp",
+                            "computer vision", "artificial intelligence",
+                            "transformer", "large language model", "llm",
+                            "software", "database", "computing"],
+            "NATURE":      ["biology", "genomics", "protein", "cell", "gene",
+                            "bioinformatics", "ecology", "physics", "chemistry",
+                            "molecule", "quantum", "particle", "medicine"],
+            "HUMAN":       ["psychology", "cognition", "neuroscience", "behavior",
+                            "perception", "decision making"],
+            "SOCIAL":      ["sociology", "economics", "political science",
+                            "governance", "anthropology", "organization"],
+            "CULTURE":     ["art", "music", "cinema", "film", "literature",
+                            "philosophy", "religion", "ethics"],
+            "DESIGN":      ["ux", "user experience", "product design",
+                            "architecture", "systems thinking"],
+            "ENGINEERING": ["infrastructure", "hardware", "energy",
+                            "systems engineering", "applied engineering"],
+            "META":        [],
         },
         "watch_interval_seconds": 10,
         "slug_word_limit": 6,
@@ -88,11 +129,17 @@ def load_config() -> dict:
 # ---------------------------------------------------------------------------
 # Text helpers
 # ---------------------------------------------------------------------------
+FILLER_WORDS = {
+    "a", "an", "the", "of", "in", "on", "at", "to", "for", "with",
+    "and", "or", "is", "are", "its", "via", "by", "as", "from",
+    "into", "this", "that", "which", "how", "why", "what", "when",
+}
+
 def clean_text(text: str) -> str:
     return re.sub(r"[^a-z0-9\- ]", "", text.lower()).strip()
 
 def slugify(title: str, word_limit: int = 6) -> str:
-    words = clean_text(title).split()
+    words = [w for w in clean_text(title).split() if w not in FILLER_WORDS]
     return "-".join(words[:word_limit])
 
 # ---------------------------------------------------------------------------
@@ -102,7 +149,7 @@ def extract_pdf_metadata(path: Path) -> tuple[str, str, str]:
     """Return (title, author, year) from PDF metadata or safe fallbacks."""
     title  = path.stem
     author = "unknown"
-    year   = str(datetime.now().year)
+    year   = "0000"  # unknown until extracted from PDF
 
     if PdfReader is None:
         log.warning("PyPDF2 not installed — using filename as title.")
@@ -148,7 +195,7 @@ def infer_domain(title: str, cfg: dict) -> str:
 # ---------------------------------------------------------------------------
 # Filename validation
 # ---------------------------------------------------------------------------
-FILENAME_PATTERN = re.compile(r"^[A-Z]+_[A-Z]+_\d{4}_[a-z0-9\-]+_[a-z]+\.pdf$")
+FILENAME_PATTERN = re.compile(r"^[A-Z]+_[A-Z]+_\d{4}_[a-z0-9\-]+_[a-z]+(?:_v\d+)?\.pdf$")
 
 def validate_filename(name: str) -> bool:
     return bool(FILENAME_PATTERN.match(name))
@@ -165,19 +212,36 @@ def process_file(path: Path, cfg: dict) -> dict | None:
     doc_type    = infer_type(title, cfg)
     domain      = infer_domain(title, cfg)
 
-    new_name    = f"{doc_type}_{domain}_{year}_{short_title}_{author}.pdf"
+    new_name = f"{doc_type}_{domain}_{year}_{short_title}_{author}.pdf"
+
+    # Enforce 100-character filename limit by trimming the slug
+    if len(new_name) > 100:
+        fixed = len(doc_type) + len(domain) + len(author) + 12
+        max_slug = max(3, 100 - fixed)
+        trimmed = short_title[:max_slug].rstrip("-")
+        new_name = f"{doc_type}_{domain}_{year}_{trimmed}_{author}.pdf"
+        log.warning("Filename trimmed to fit 100-char limit: %s", new_name)
 
     if not validate_filename(new_name):
         log.error("Generated filename failed validation: %s", new_name)
         return None
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    dest = OUTPUT_DIR / new_name
 
-    # Avoid silent overwrite
+    # Resolve duplicates: append _v2, _v3, …
+    dest = OUTPUT_DIR / new_name
     if dest.exists():
-        log.warning("Destination exists, skipping: %s", new_name)
-        return None
+        stem = Path(new_name).stem
+        for version in range(2, 100):
+            candidate = f"{stem}_v{version}.pdf"
+            dest = OUTPUT_DIR / candidate
+            if not dest.exists():
+                new_name = candidate
+                log.info("Duplicate detected — versioned as: %s", new_name)
+                break
+        else:
+            log.error("Could not find a free filename for %s", new_name)
+            return None
 
     shutil.move(str(path), str(dest))
     log.info("Renamed → %s", new_name)
