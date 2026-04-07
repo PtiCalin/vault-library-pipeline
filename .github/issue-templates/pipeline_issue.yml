@@ -1,0 +1,62 @@
+name: Naming / metadata issue
+description: Report an incorrect TYPE–DOMAIN rename, wrong metadata extraction, or bad slug.
+title: "[pipeline] <short description>"
+labels: ["pipeline", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when the pipeline produces an incorrect filename,
+        wrong TYPE/DOMAIN inference, bad metadata, or a malformed Obsidian note.
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue category
+      options:
+        - Wrong TYPE token (e.g. PAPER when should be REVIEW)
+        - Wrong DOMAIN token (e.g. META when should be COMPUTE)
+        - Bad title slug (garbled characters, too long, truncated wrong)
+        - Wrong author extracted
+        - Wrong year extracted
+        - Obsidian note missing/wrong YAML frontmatter field
+        - Filename fails validation pattern
+        - Other metadata problem
+    validations:
+      required: true
+
+  - type: input
+    id: original_filename
+    attributes:
+      label: Original PDF filename
+      placeholder: "some-paper.pdf"
+    validations:
+      required: true
+
+  - type: input
+    id: generated_filename
+    attributes:
+      label: Generated filename (actual)
+      placeholder: "PAPER_META_2026_some-paper_unknown.pdf"
+    validations:
+      required: true
+
+  - type: input
+    id: expected_filename
+    attributes:
+      label: Expected filename (correct)
+      placeholder: "REVIEW_COMPUTE_2023_attention-is-all-you-need_vaswani.pdf"
+    validations:
+      required: true
+
+  - type: textarea
+    id: pdf_metadata
+    attributes:
+      label: PDF metadata (if known)
+      description: Paste the raw title/author from the PDF or its properties panel.
+      render: text
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context

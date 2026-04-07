@@ -1,0 +1,21 @@
+# CODEOWNERS
+
+> Automatically request reviews from these users when matching files change.
+
+    https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+*                           @PtiCalin
+
+# Core pipeline scripts
+library_pipeline/cli.py     @PtiCalin
+library_pipeline/export_to_obsidian.py @PtiCalin
+
+# Configuration
+library_pipeline/config.yaml @PtiCalin
+
+# Templates
+library_pipeline/templates/  @PtiCalin
+
+# CI / GitHub config
+.github/                    @PtiCalin
