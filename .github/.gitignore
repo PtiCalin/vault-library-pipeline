@@ -1,0 +1,8 @@
+# Secrets and local overrides — never commit these
+secrets.yaml
+*.secret
+*.token
+*.key
+
+# Generated workflow artifacts
+*.log

@@ -8,16 +8,16 @@ Obsidian with YAML frontmatter for a scalable knowledge system.
 
 ## System architecture
 
-```
+```txt
 PDF → cli.py → (renamed PDF + metadata.json)
                        ↓
               Zotero import (Better BibTeX)
                        ↓
-         Zotero note template (auto-note)
+            Zotero note template (auto-note)
                        ↓
       export_to_obsidian.py → exports/*.md (YAML frontmatter)
                        ↓
-              Obsidian vault
+                Obsidian vault
 ```
 
 Each step is independent and debuggable.
@@ -26,15 +26,15 @@ Each step is independent and debuggable.
 
 ## Folder structure
 
-```
+```txt
 library_pipeline/
-  input_pdfs/          ← drop PDFs here
-  processed/           ← renamed PDFs land here
-  metadata/            ← one JSON per processed PDF
-  exports/             ← Obsidian-ready markdown notes
-  templates/
+  00_templates/
     zotero-note-template.md
     obsidian-note-template.md
+  01_input_pdfs/          ← drop PDFs here
+  02_processed/           ← renamed PDFs land here
+  03_metadata/            ← one JSON per processed PDF
+  04_exports/             ← Obsidian-ready markdown notes
   cli.py               ← core processing engine
   export_to_obsidian.py
   config.yaml          ← keyword rules for TYPE/DOMAIN inference
@@ -68,12 +68,13 @@ python export_to_obsidian.py
 
 ## Naming convention
 
-```
+```txt
 TYPE_DOMAIN_YEAR_short-title-slug_authorlastname.pdf
 ```
 
 Examples:
-```
+
+```txt
 PAPER_COMPUTE_2023_attention-is-all-you-need_vaswani.pdf
 REVIEW_BIO_2021_systematic-review-crispr-gene_zhang.pdf
 SURVEY_COMPUTE_2022_survey-large-language-models_zhao.pdf
@@ -113,5 +114,3 @@ All keyword matches are case-insensitive substring checks against the PDF title.
 - ~70 % accurate metadata extraction from PDF headers
 - ~80 % correct TYPE/DOMAIN naming
 - Manual correction expected for noisy PDFs
-
-Do not over-engineer before running on real PDFs.
