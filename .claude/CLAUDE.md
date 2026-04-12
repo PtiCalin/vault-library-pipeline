@@ -2,10 +2,10 @@
 
 ## Project Identity
 
-**Name:** vault-library-pipeline
-**Owner:** PtiCalin (Charlie)
-**Type:** local-first Python document-processing pipeline
-**Primary goal:** turn raw PDFs into consistently named files, metadata JSON, and Obsidian-ready notes
+**Name:** vault-library-pipeline  
+**Owner:** PtiCalin (Charlie)  
+**Type:** local-first Python document-processing pipeline  
+**Primary goal:** turn raw PDFs into consistently named files, metadata JSON, and Obsidian-ready notes  
 **Status:** active workflow and naming-system refinement
 
 ---
