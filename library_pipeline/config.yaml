@@ -1,48 +1,140 @@
-# vault-library-pipeline configuration
-# Edit keyword lists to match your library's subject areas.
-# All matches are case-insensitive substring checks on the PDF title.
+# vault-library-pipeline — configuration
+# All matches are case-insensitive checks on normalized title, filename,
+# and, when available, first-page PDF text.
+# Best-scoring key wins in each section.
+# PAPER (type) and META (domain) are built-in catch-alls — keep them last.
 
 # ------------------------------------------------------------------
 # TYPE inference
 # Keys become the TYPE token in the filename (must be UPPER_ALPHA).
-# First matching key wins; PAPER is the built-in fallback.
 # ------------------------------------------------------------------
 type_keywords:
-  REVIEW:  ["review", "systematic review", "literature review", "meta-analysis"]
-  SURVEY:  ["survey"]
-  THESIS:  ["thesis", "dissertation", "mémoire"]
-  REPORT:  ["report", "technical report", "white paper"]
-  BOOK:    ["handbook", "textbook", "introduction to", "guide to"]
-  CONF:    ["proceedings", "workshop", "conference paper"]
+
+  # Academic
+  REVIEW:       ["review", "systematic review", "literature review"]
+  SURVEY:       ["survey"]
+  META:         ["meta-analysis", "meta analysis"]
+  THESIS:       ["thesis", "mémoire"]
+  DISSERTATION: ["dissertation", "doctoral thesis", "phd thesis"]
+  PREPRINT:     ["preprint", "arxiv", "working paper"]
+
+  # Conference / publication formats
+  PROCEEDING:   ["proceedings", "conference paper", "in proceedings"]
+  ABSTRACT:     ["extended abstract", "abstract only"]
+  POSTER:       ["poster"]
+  TALK:         ["presentation", "slide deck", "keynote", "talk slides"]
+
+  # Books & long-form
+  BOOK:         ["handbook", "textbook", "introduction to", "guide to",
+                  "principles of", "foundations of"]
+  CHAPTER:      ["chapter"]
+  MONOGRAPH:    ["monograph"]
+
+  # Technical / industry / grey literature
+  REPORT:       ["report", "technical report"]
+  WHITEPAPER:   ["white paper", "whitepaper", "position paper"]
+  STANDARD:     ["iso standard", "rfc", "w3c recommendation", "ieee standard"]
+  SPEC:         ["specification", "api spec", "technical specification"]
+  DOC:          ["documentation", "reference manual", "user manual"]
+
+  # Educational / explanatory
+  TUTORIAL:     ["tutorial", "step-by-step guide"]
+  GUIDE:        ["guide", "how-to", "best practices"]
+  COURSE:       ["course material", "lecture notes", "lecture series"]
+  NOTE:         ["reading notes", "field notes", "informal notes"]
+
+  # Data / code / artifacts
+  DATASET:      ["dataset", "data collection", "corpus"]
+  BENCHMARK:    ["benchmark", "evaluation dataset", "leaderboard"]
+  CODE:         ["implementation", "codebase", "repository reference"]
+  MODEL:        ["model architecture", "pretrained model", "model card"]
+
+  # Media / communication
+  ARTICLE:      ["magazine article", "editorial", "op-ed"]
+  BLOG:         ["blog post", "blog"]
+  NEWS:         ["news article", "press release"]
+  INTERVIEW:    ["interview", "q&a", "discussion transcript"]
+
+  # Legal / policy
+  POLICY:       ["policy document", "governance document", "framework document"]
+  LAW:          ["legal text", "statute", "legislation"]
+  REGULATION:   ["regulation", "regulatory document", "directive"]
+
+  # Catch-all — always last
+  PAPER:        []
 
 # ------------------------------------------------------------------
 # DOMAIN inference
 # Keys become the DOMAIN token in the filename (must be UPPER_ALPHA).
-# First matching key wins; META is the built-in fallback.
+# Subdomains (e.g. COMPUTE.RECSYS) go in tags, not in the filename.
 # ------------------------------------------------------------------
 domain_keywords:
-  COMPUTE: ["algorithm", "machine learning", "deep learning",
-            "neural network", "recommendation", "nlp",
-            "computer vision", "ai", "artificial intelligence",
-            "transformer", "large language model", "llm"]
-  BIO:     ["biology", "genomics", "protein", "cell", "gene",
-            "bioinformatics", "neuroscience", "ecology"]
-  PHYSICS: ["quantum", "particle", "relativity", "thermodynamics",
-            "astrophysics", "optics", "mechanics"]
-  CHEM:    ["chemistry", "molecule", "reaction", "polymer", "catalyst"]
-  SOCIAL:  ["sociology", "psychology", "economics", "policy",
-            "political science", "anthropology", "education"]
-  HISTORY: ["history", "archive", "medieval", "ancient", "modern history"]
-  PHIL:    ["philosophy", "ethics", "epistemology", "ontology"]
-  MATH:    ["mathematics", "algebra", "topology", "statistics",
-            "probability", "calculus", "combinatorics"]
+
+  FORMAL:      ["mathematics", "mathematical", "logic", "statistics",
+                "statistical", "optimization", "algebra", "topology",
+                "probability", "calculus", "combinatorics", "formal methods",
+                "symbolic"]
+
+  COMPUTE:     ["algorithm", "machine learning", "deep learning",
+                "neural network", "recommendation system", "natural language",
+                "nlp", "computer vision", "artificial intelligence",
+                "transformer", "large language model", "llm", "generative ai",
+                "software engineering", "database", "distributed system",
+                "network security", "cybersecurity", "cyber security",
+                "infosec", "information security", "computer security",
+                "malware", "spyware", "trojan", "ransomware", "phishing",
+                "attack", "attacks", "exploit", "exploits", "zero click",
+                "zeroclick", "zero-click", "sandbox", "android", "ios",
+                "mobile security", "threat detection", "threat intelligence",
+                "forensics", "reverse engineering", "vulnerability",
+                "vulnerabilities", "blockchain", "computing"]
+
+  NATURE:      ["biology", "genomics", "protein", "cell biology", "genetics",
+                "gene", "bioinformatics", "ecology", "physics", "chemistry",
+                "molecule", "quantum", "particle physics", "medicine",
+                "pharmacology", "astrophysics", "neurobiology", "molecular"]
+
+  HUMAN:       ["psychology", "cognitive science", "cognition", "neuroscience",
+                "human behavior", "perception", "decision making",
+                "behavioral science", "mental health"]
+
+  SOCIAL:      ["sociology", "economics", "political science", "politics",
+                "governance", "public policy", "anthropology", "organization",
+                "social science", "international relations"]
+
+  CULTURE:     ["art history", "musicology", "cinema studies", "film studies",
+                "literary", "philosophy", "religion", "ethics", "aesthetics",
+                "cultural studies", "media studies"]
+
+  DESIGN:      ["ux design", "user experience", "product design",
+                "interaction design", "architecture", "urban design",
+                "systems thinking", "design thinking", "graphic design"]
+
+  ENGINEERING: ["infrastructure", "hardware", "energy systems",
+                "systems engineering", "applied engineering", "civil engineering",
+                "mechanical engineering", "electrical engineering"]
+
+  # Catch-all — always last
+  META:        []
 
 # ------------------------------------------------------------------
 # Slugification
 # ------------------------------------------------------------------
-slug_word_limit: 6   # Max words used from the title in the filename slug
+slug_word_limit: 6     # max keywords kept from the title (3–6 recommended)
+
+# ------------------------------------------------------------------
+# Metadata enrichment
+# ------------------------------------------------------------------
+metadata_enrichment:
+  enabled: true
+  grobid_url: ""                # optional, e.g. http://localhost:8070
+  grobid_timeout_seconds: 20
+  crossref_enabled: true
+  semantic_scholar_enabled: true
+  api_timeout_seconds: 15
+  user_agent: "vault-library-pipeline/1.1"
 
 # ------------------------------------------------------------------
 # Watch mode
 # ------------------------------------------------------------------
-watch_interval_seconds: 10   # How often (seconds) to poll input_pdfs/
+watch_interval_seconds: 10   # poll interval for --watch mode (seconds)
