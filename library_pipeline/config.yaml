@@ -1,6 +1,7 @@
 # vault-library-pipeline — configuration
-# All matches are case-insensitive substring checks on the PDF title.
-# First matching key wins in each section.
+# All matches are case-insensitive checks on normalized title, filename,
+# and, when available, first-page PDF text.
+# Best-scoring key wins in each section.
 # PAPER (type) and META (domain) are built-in catch-alls — keep them last.
 
 # ------------------------------------------------------------------
@@ -79,7 +80,14 @@ domain_keywords:
                 "nlp", "computer vision", "artificial intelligence",
                 "transformer", "large language model", "llm", "generative ai",
                 "software engineering", "database", "distributed system",
-                "network security", "cybersecurity", "blockchain", "computing"]
+                "network security", "cybersecurity", "cyber security",
+                "infosec", "information security", "computer security",
+                "malware", "spyware", "trojan", "ransomware", "phishing",
+                "attack", "attacks", "exploit", "exploits", "zero click",
+                "zeroclick", "zero-click", "sandbox", "android", "ios",
+                "mobile security", "threat detection", "threat intelligence",
+                "forensics", "reverse engineering", "vulnerability",
+                "vulnerabilities", "blockchain", "computing"]
 
   NATURE:      ["biology", "genomics", "protein", "cell biology", "genetics",
                 "gene", "bioinformatics", "ecology", "physics", "chemistry",
@@ -113,6 +121,18 @@ domain_keywords:
 # Slugification
 # ------------------------------------------------------------------
 slug_word_limit: 6     # max keywords kept from the title (3–6 recommended)
+
+# ------------------------------------------------------------------
+# Metadata enrichment
+# ------------------------------------------------------------------
+metadata_enrichment:
+  enabled: true
+  grobid_url: ""                # optional, e.g. http://localhost:8070
+  grobid_timeout_seconds: 20
+  crossref_enabled: true
+  semantic_scholar_enabled: true
+  api_timeout_seconds: 15
+  user_agent: "vault-library-pipeline/1.1"
 
 # ------------------------------------------------------------------
 # Watch mode
