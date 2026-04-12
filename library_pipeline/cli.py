@@ -16,13 +16,22 @@ import time
 import shutil
 import argparse
 import logging
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime
+from urllib import error as urllib_error
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
+from xml.etree import ElementTree
 
 try:
-    from PyPDF2 import PdfReader
+    from pdfminer.high_level import extract_text as pdf_extract_text
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfparser import PDFParser
 except ImportError:
-    PdfReader = None
+    pdf_extract_text = None
+    PDFDocument = None
+    PDFParser = None
 
 try:
     import yaml
@@ -32,10 +41,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Paths (resolved relative to this file so the CLI works from any cwd)
 # ---------------------------------------------------------------------------
-BASE_DIR   = Path(__file__).parent
-INPUT_DIR  = BASE_DIR / "input_pdfs"
-OUTPUT_DIR = BASE_DIR / "processed"
-META_DIR   = BASE_DIR / "metadata"
+BASE_DIR    = Path(__file__).parent
+INPUT_DIR   = BASE_DIR / "01_input_pdfs"
+OUTPUT_DIR  = BASE_DIR / "02_processed"
+META_DIR    = BASE_DIR / "03_metadata"
 CONFIG_FILE = BASE_DIR / "config.yaml"
 
 # ---------------------------------------------------------------------------
@@ -47,6 +56,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("vault-pipeline")
 
+DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:a-z0-9]+\b", re.IGNORECASE)
+YEAR_PATTERN = re.compile(r"(?:19|20)\d{2}")
+DEFAULT_USER_AGENT = "vault-library-pipeline/1.1"
+
 # ---------------------------------------------------------------------------
 # Config loader
 # ---------------------------------------------------------------------------
@@ -54,21 +67,71 @@ def load_config() -> dict:
     """Load config.yaml if available; fall back to safe defaults."""
     defaults = {
         "type_keywords": {
-            "REVIEW":   ["review", "systematic review", "literature review"],
-            "SURVEY":   ["survey"],
-            "THESIS":   ["thesis", "dissertation"],
-            "REPORT":   ["report", "technical report"],
-            "PAPER":    [],           # catch-all
+            "REVIEW":       ["review", "systematic review", "literature review"],
+            "SURVEY":       ["survey"],
+            "META":         ["meta-analysis"],
+            "THESIS":       ["thesis"],
+            "DISSERTATION": ["dissertation", "doctoral"],
+            "PREPRINT":     ["preprint", "arxiv"],
+            "PROCEEDING":   ["proceedings", "conference paper"],
+            "POSTER":       ["poster"],
+            "TALK":         ["presentation", "slide deck"],
+            "BOOK":         ["handbook", "textbook", "introduction to"],
+            "CHAPTER":      ["chapter"],
+            "MONOGRAPH":    ["monograph"],
+            "REPORT":       ["report", "technical report"],
+            "WHITEPAPER":   ["white paper", "whitepaper"],
+            "STANDARD":     ["iso", "rfc", "w3c"],
+            "SPEC":         ["specification"],
+            "DOC":          ["documentation"],
+            "TUTORIAL":     ["tutorial"],
+            "GUIDE":        ["guide", "how to"],
+            "COURSE":       ["course", "lecture notes"],
+            "NOTE":         ["notes"],
+            "DATASET":      ["dataset"],
+            "BENCHMARK":    ["benchmark"],
+            "CODE":         ["implementation"],
+            "MODEL":        ["model architecture"],
+            "ARTICLE":      ["magazine article"],
+            "BLOG":         ["blog"],
+            "NEWS":         ["news"],
+            "INTERVIEW":    ["interview"],
+            "POLICY":       ["policy"],
+            "LAW":          ["legal text"],
+            "REGULATION":   ["regulation"],
+            "PAPER":        [],
         },
         "domain_keywords": {
-            "COMPUTE":  ["algorithm", "machine learning", "deep learning",
-                         "neural network", "recommendation", "nlp",
-                         "computer vision", "ai", "artificial intelligence"],
-            "BIO":      ["biology", "genomics", "protein", "cell", "gene"],
-            "PHYSICS":  ["quantum", "particle", "relativity", "thermodynamics"],
-            "SOCIAL":   ["sociology", "psychology", "economics", "policy"],
-            "HISTORY":  ["history", "archive", "medieval", "ancient"],
-            "META":     [],           # catch-all
+            "FORMAL":      ["mathematics", "logic", "statistics", "optimization",
+                            "algebra", "topology", "probability", "calculus"],
+            "COMPUTE":     ["algorithm", "machine learning", "deep learning",
+                            "neural network", "recommendation", "nlp",
+                            "computer vision", "artificial intelligence",
+                            "transformer", "large language model", "llm",
+                            "software", "database", "computing"],
+            "NATURE":      ["biology", "genomics", "protein", "cell", "gene",
+                            "bioinformatics", "ecology", "physics", "chemistry",
+                            "molecule", "quantum", "particle", "medicine"],
+            "HUMAN":       ["psychology", "cognition", "neuroscience", "behavior",
+                            "perception", "decision making"],
+            "SOCIAL":      ["sociology", "economics", "political science",
+                            "governance", "anthropology", "organization"],
+            "CULTURE":     ["art", "music", "cinema", "film", "literature",
+                            "philosophy", "religion", "ethics"],
+            "DESIGN":      ["ux", "user experience", "product design",
+                            "architecture", "systems thinking"],
+            "ENGINEERING": ["infrastructure", "hardware", "energy",
+                            "systems engineering", "applied engineering"],
+            "META":        [],
+        },
+        "metadata_enrichment": {
+            "enabled": True,
+            "grobid_url": "",
+            "grobid_timeout_seconds": 20,
+            "crossref_enabled": True,
+            "semantic_scholar_enabled": True,
+            "api_timeout_seconds": 15,
+            "user_agent": DEFAULT_USER_AGENT,
         },
         "watch_interval_seconds": 10,
         "slug_word_limit": 6,
@@ -80,6 +143,8 @@ def load_config() -> dict:
         for section in ("type_keywords", "domain_keywords"):
             if section in user_cfg:
                 defaults[section].update(user_cfg[section])
+        if "metadata_enrichment" in user_cfg:
+            defaults["metadata_enrichment"].update(user_cfg["metadata_enrichment"])
         for key in ("watch_interval_seconds", "slug_word_limit"):
             if key in user_cfg:
                 defaults[key] = user_cfg[key]
@@ -88,67 +153,391 @@ def load_config() -> dict:
 # ---------------------------------------------------------------------------
 # Text helpers
 # ---------------------------------------------------------------------------
+FILLER_WORDS = {
+    "a", "an", "the", "of", "in", "on", "at", "to", "for", "with",
+    "and", "or", "is", "are", "its", "via", "by", "as", "from",
+    "into", "this", "that", "which", "how", "why", "what", "when",
+}
+
+NOISE_WORDS = {
+    "doi", "isbn", "issn", "springer", "elsevier", "wiley", "ieee",
+    "acm", "unknown", "untitled", "www", "http", "https",
+}
+
 def clean_text(text: str) -> str:
     return re.sub(r"[^a-z0-9\- ]", "", text.lower()).strip()
 
 def slugify(title: str, word_limit: int = 6) -> str:
-    words = clean_text(title).split()
+    words = [w for w in clean_text(title).split() if w not in FILLER_WORDS]
     return "-".join(words[:word_limit])
+
+def decode_pdf_value(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        for encoding in ("utf-8", "utf-16", "latin-1"):
+            try:
+                return value.decode(encoding).strip()
+            except UnicodeDecodeError:
+                continue
+        return value.decode("utf-8", errors="ignore").strip()
+    return str(value).strip()
+
+def normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
+
+def tokenize_text(text: str) -> list[str]:
+    return [token for token in normalize_text(text).split() if token and token not in NOISE_WORDS]
+
+def looks_like_identifier(text: str) -> bool:
+    tokens = tokenize_text(text)
+    if not tokens:
+        return True
+    if len(tokens) == 1 and re.fullmatch(r"[0-9x\-]+", tokens[0]):
+        return True
+    digit_count = sum(char.isdigit() for char in text)
+    alpha_count = sum(char.isalpha() for char in text)
+    return digit_count > alpha_count and alpha_count < 6
+
+def extract_year(text: str) -> str:
+    if not text:
+        return "0000"
+    match = YEAR_PATTERN.search(text)
+    return match.group(0) if match else "0000"
+
+def sanitize_author_token(value: str) -> str:
+    if not value:
+        return "unknown"
+    if "," in value:
+        value = value.split(",", 1)[0]
+    parts = re.findall(r"[A-Za-z]+", value)
+    return parts[-1].lower() if parts else "unknown"
+
+def extract_doi(text: str) -> str:
+    if not text:
+        return ""
+    match = DOI_PATTERN.search(text)
+    if not match:
+        return ""
+    doi = match.group(0).rstrip(".,;)\"]'")
+    return doi.lower()
+
+def parse_author_list(raw_value: str) -> list[str]:
+    if not raw_value:
+        return []
+    parts = [part.strip() for part in re.split(r";| and ", raw_value) if part.strip()]
+    return parts
+
+def format_author_name(given: str, family: str) -> str:
+    return " ".join(part for part in (given.strip(), family.strip()) if part).strip()
+
+def prefer_title(current: str, candidate: str) -> bool:
+    if not candidate:
+        return False
+    if not current:
+        return True
+    if looks_like_identifier(current) and not looks_like_identifier(candidate):
+        return True
+    current_tokens = tokenize_text(current)
+    candidate_tokens = tokenize_text(candidate)
+    return len(candidate_tokens) >= max(3, len(current_tokens) + 2) and len(candidate) > len(current)
+
+def extract_pdf_info(path: Path) -> dict[str, str]:
+    if PDFParser is None or PDFDocument is None:
+        return {}
+    try:
+        with path.open("rb") as fh:
+            parser = PDFParser(fh)
+            document = PDFDocument(parser)
+            info = document.info[0] if document.info else {}
+    except Exception as exc:
+        log.warning("Could not read PDF info for %s: %s", path.name, exc)
+        return {}
+
+    decoded: dict[str, str] = {}
+    for key, value in info.items():
+        normalized_key = str(key).lstrip("/").lower()
+        decoded[normalized_key] = decode_pdf_value(value)
+    return decoded
+
+def extract_pdf_text(path: Path, page_numbers: list[int], char_limit: int) -> str:
+    if pdf_extract_text is None:
+        return ""
+    try:
+        return (pdf_extract_text(str(path), page_numbers=page_numbers) or "")[:char_limit]
+    except Exception as exc:
+        log.warning("Could not extract PDF text for %s: %s", path.name, exc)
+        return ""
+
+def extract_first_page_text(path: Path) -> str:
+    return extract_pdf_text(path, [0], 8000)
+
+def extract_front_matter_text(path: Path) -> str:
+    return extract_pdf_text(path, [0, 1], 16000)
+
+def build_classification_text(path: Path, title: str, first_page_text: str = "") -> str:
+    parts = [title, path.stem]
+    if first_page_text:
+        parts.append(first_page_text)
+
+    if looks_like_identifier(title):
+        stem_tokens = tokenize_text(path.stem)
+        if stem_tokens:
+            parts.append(" ".join(stem_tokens))
+
+    return normalize_text(" ".join(part for part in parts if part))
+
+def score_label_matches(text: str, keywords: list[str]) -> tuple[int, int]:
+    score = 0
+    matched_keywords = 0
+    for keyword in keywords:
+        normalized_keyword = normalize_text(keyword)
+        if not normalized_keyword:
+            continue
+        if f" {normalized_keyword} " in f" {text} ":
+            matched_keywords += 1
+            score += max(1, len(normalized_keyword.split()))
+    return score, matched_keywords
+
+def infer_label(text: str, keyword_map: dict, fallback: str) -> str:
+    best_label = fallback
+    best_score = 0
+    best_match_count = 0
+
+    for label, keywords in keyword_map.items():
+        if not keywords:
+            continue
+        score, match_count = score_label_matches(text, keywords)
+        if score > best_score or (score == best_score and match_count > best_match_count):
+            best_label = label
+            best_score = score
+            best_match_count = match_count
+
+    return best_label if best_score else fallback
+
+def fetch_json(url: str, headers: dict[str, str], timeout: int) -> dict | None:
+    request = urllib_request.Request(url, headers=headers)
+    try:
+        with urllib_request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib_error.URLError, urllib_error.HTTPError, json.JSONDecodeError) as exc:
+        log.warning("HTTP metadata lookup failed for %s: %s", url, exc)
+        return None
+
+def build_multipart_body(path: Path, field_name: str = "input") -> tuple[bytes, str]:
+    boundary = f"----vaultpipeline{int(time.time() * 1000)}"
+    with path.open("rb") as fh:
+        payload = fh.read()
+    buffer = BytesIO()
+    buffer.write(f"--{boundary}\r\n".encode("utf-8"))
+    disposition = (
+        f'Content-Disposition: form-data; name="{field_name}"; '
+        f'filename="{path.name}"\r\n'
+    )
+    buffer.write(disposition.encode("utf-8"))
+    buffer.write(b"Content-Type: application/pdf\r\n\r\n")
+    buffer.write(payload)
+    buffer.write(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    return buffer.getvalue(), boundary
+
+def post_xml(url: str, path: Path, headers: dict[str, str], timeout: int) -> str:
+    body, boundary = build_multipart_body(path)
+    request_headers = {
+        **headers,
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Accept": "application/xml",
+    }
+    request = urllib_request.Request(url, data=body, headers=request_headers, method="POST")
+    with urllib_request.urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8")
+
+def parse_grobid_metadata(xml_text: str) -> dict:
+    ns = {"tei": "http://www.tei-c.org/ns/1.0"}
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError as exc:
+        log.warning("Could not parse GROBID response: %s", exc)
+        return {}
+
+    title = " ".join(root.findtext(".//tei:titleStmt/tei:title", default="", namespaces=ns).split())
+    abstract = " ".join(root.findtext(".//tei:profileDesc/tei:abstract", default="", namespaces=ns).split())
+    doi = root.findtext(".//tei:idno[@type='DOI']", default="", namespaces=ns).strip().lower()
+
+    author_names: list[str] = []
+    for author in root.findall(".//tei:sourceDesc//tei:author", ns):
+        given_parts = [part.text.strip() for part in author.findall(".//tei:forename", ns) if part.text]
+        surname = author.findtext(".//tei:surname", default="", namespaces=ns).strip()
+        full_name = format_author_name(" ".join(given_parts), surname)
+        if full_name:
+            author_names.append(full_name)
+
+    date_node = root.find(".//tei:publicationStmt/tei:date", ns)
+    year = "0000"
+    if date_node is not None:
+        year = extract_year(date_node.attrib.get("when", "") or (date_node.text or ""))
+
+    return {
+        "title": title,
+        "authors": author_names,
+        "author": sanitize_author_token(author_names[0]) if author_names else "unknown",
+        "year": year,
+        "doi": doi,
+        "abstract": abstract,
+    }
+
+def fetch_grobid_metadata(path: Path, cfg: dict) -> dict:
+    enrichment_cfg = cfg["metadata_enrichment"]
+    grobid_url = enrichment_cfg.get("grobid_url", "").strip()
+    if not grobid_url:
+        return {}
+    endpoint = grobid_url.rstrip("/")
+    if not endpoint.endswith("/api/processHeaderDocument"):
+        endpoint = f"{endpoint}/api/processHeaderDocument"
+
+    headers = {"User-Agent": enrichment_cfg.get("user_agent", DEFAULT_USER_AGENT)}
+    try:
+        xml_text = post_xml(endpoint, path, headers, enrichment_cfg.get("grobid_timeout_seconds", 20))
+    except urllib_error.URLError as exc:
+        log.warning("GROBID lookup failed for %s: %s", path.name, exc)
+        return {}
+    return parse_grobid_metadata(xml_text)
+
+def parse_crossref_metadata(payload: dict) -> dict:
+    message = payload.get("message") or {}
+    title = " ".join((message.get("title") or [""])[0].split())
+    authors = []
+    for author in message.get("author") or []:
+        full_name = format_author_name(author.get("given", ""), author.get("family", ""))
+        if full_name:
+            authors.append(full_name)
+    abstract = " ".join((message.get("abstract") or "").split())
+    year = "0000"
+    for field in ("published-print", "published-online", "issued", "created"):
+        date_parts = (((message.get(field) or {}).get("date-parts") or [[None]])[0])
+        if date_parts and date_parts[0]:
+            year = str(date_parts[0])
+            break
+    doi = (message.get("DOI") or "").lower()
+    return {
+        "title": title,
+        "authors": authors,
+        "author": sanitize_author_token(authors[0]) if authors else "unknown",
+        "year": year,
+        "doi": doi,
+        "abstract": abstract,
+    }
+
+def fetch_crossref_metadata(doi: str, cfg: dict) -> dict:
+    enrichment_cfg = cfg["metadata_enrichment"]
+    if not enrichment_cfg.get("crossref_enabled", True) or not doi:
+        return {}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": enrichment_cfg.get("user_agent", DEFAULT_USER_AGENT),
+    }
+    url = f"https://api.crossref.org/works/{urllib_parse.quote(doi)}"
+    payload = fetch_json(url, headers, enrichment_cfg.get("api_timeout_seconds", 15))
+    return parse_crossref_metadata(payload) if payload else {}
+
+def parse_semantic_scholar_metadata(payload: dict) -> dict:
+    authors = [author.get("name", "").strip() for author in payload.get("authors") or [] if author.get("name")]
+    return {
+        "title": " ".join((payload.get("title") or "").split()),
+        "authors": authors,
+        "author": sanitize_author_token(authors[0]) if authors else "unknown",
+        "year": str(payload.get("year") or "0000"),
+        "doi": ((payload.get("externalIds") or {}).get("DOI") or "").lower(),
+        "abstract": " ".join((payload.get("abstract") or "").split()),
+    }
+
+def fetch_semantic_scholar_metadata(doi: str, cfg: dict) -> dict:
+    enrichment_cfg = cfg["metadata_enrichment"]
+    if not enrichment_cfg.get("semantic_scholar_enabled", True) or not doi:
+        return {}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": enrichment_cfg.get("user_agent", DEFAULT_USER_AGENT),
+    }
+    fields = "title,authors,year,abstract,externalIds"
+    url = (
+        "https://api.semanticscholar.org/graph/v1/paper/DOI:"
+        f"{urllib_parse.quote(doi)}?fields={urllib_parse.quote(fields)}"
+    )
+    payload = fetch_json(url, headers, enrichment_cfg.get("api_timeout_seconds", 15))
+    return parse_semantic_scholar_metadata(payload) if payload else {}
+
+def merge_metadata(base: dict, candidate: dict, source: str) -> None:
+    if not candidate:
+        return
+    if source not in base["metadata_sources"]:
+        base["metadata_sources"].append(source)
+    if candidate.get("title") and prefer_title(base.get("title", ""), candidate["title"]):
+        base["title"] = candidate["title"]
+    if candidate.get("authors") and not base.get("authors"):
+        base["authors"] = candidate["authors"]
+    if candidate.get("author") and (base.get("author") in {"", "unknown"}):
+        base["author"] = sanitize_author_token(candidate["author"])
+    if candidate.get("year") and base.get("year") == "0000" and candidate["year"] != "0000":
+        base["year"] = candidate["year"]
+    if candidate.get("doi") and not base.get("doi"):
+        base["doi"] = candidate["doi"]
+    if candidate.get("abstract") and not base.get("abstract"):
+        base["abstract"] = candidate["abstract"]
+
+def extract_document_metadata(path: Path, cfg: dict) -> dict:
+    title = path.stem
+    author = "unknown"
+    year = "0000"
+    authors: list[str] = []
+    pdf_info = extract_pdf_info(path)
+    if pdf_info.get("title"):
+        title = pdf_info["title"]
+    if pdf_info.get("author"):
+        authors = parse_author_list(pdf_info["author"])
+        if authors:
+            author = sanitize_author_token(authors[0])
+    if pdf_info.get("creationdate"):
+        year = extract_year(pdf_info["creationdate"])
+    if pdf_info.get("moddate") and year == "0000":
+        year = extract_year(pdf_info["moddate"])
+
+    first_page_text = extract_first_page_text(path)
+    front_matter_text = extract_front_matter_text(path)
+    metadata = {
+        "title": title,
+        "author": author,
+        "authors": authors,
+        "year": year,
+        "doi": extract_doi(" ".join(part for part in (title, front_matter_text) if part)),
+        "abstract": "",
+        "first_page_text": first_page_text,
+        "metadata_sources": ["pdf"],
+    }
+
+    enrichment_cfg = cfg.get("metadata_enrichment", {})
+    if enrichment_cfg.get("enabled", True):
+        merge_metadata(metadata, fetch_grobid_metadata(path, cfg), "grobid")
+        if metadata.get("doi"):
+            merge_metadata(metadata, fetch_crossref_metadata(metadata["doi"], cfg), "crossref")
+            merge_metadata(metadata, fetch_semantic_scholar_metadata(metadata["doi"], cfg), "semantic_scholar")
+
+    metadata["author"] = sanitize_author_token(metadata.get("author", ""))
+    metadata["year"] = metadata.get("year") or "0000"
+    return metadata
 
 # ---------------------------------------------------------------------------
 # Metadata extraction
 # ---------------------------------------------------------------------------
-def extract_pdf_metadata(path: Path) -> tuple[str, str, str]:
-    """Return (title, author, year) from PDF metadata or safe fallbacks."""
-    title  = path.stem
-    author = "unknown"
-    year   = str(datetime.now().year)
+def infer_type(classification_text: str, cfg: dict) -> str:
+    return infer_label(classification_text, cfg["type_keywords"], "PAPER")
 
-    if PdfReader is None:
-        log.warning("PyPDF2 not installed — using filename as title.")
-        return title, author, year
-
-    try:
-        reader = PdfReader(str(path))
-        meta   = reader.metadata
-        if meta:
-            if meta.title:
-                title = meta.title.strip()
-            if meta.author:
-                first_author = meta.author.split(";")[0].split(",")[0].split()
-                author = first_author[-1].lower() if first_author else "unknown"
-            # /CreationDate format: D:20210415...
-            creation = getattr(meta, "creation_date", None)
-            if creation:
-                year = str(creation.year)
-    except Exception as exc:
-        log.warning("Could not read PDF metadata for %s: %s", path.name, exc)
-
-    # Sanitise author (strip non-alpha)
-    author = re.sub(r"[^a-z]", "", author) or "unknown"
-    return title, author, year
-
-# ---------------------------------------------------------------------------
-# TYPE / DOMAIN inference
-# ---------------------------------------------------------------------------
-def infer_type(title: str, cfg: dict) -> str:
-    t = title.lower()
-    for type_label, keywords in cfg["type_keywords"].items():
-        if keywords and any(k in t for k in keywords):
-            return type_label
-    return "PAPER"
-
-def infer_domain(title: str, cfg: dict) -> str:
-    t = title.lower()
-    for domain_label, keywords in cfg["domain_keywords"].items():
-        if keywords and any(k in t for k in keywords):
-            return domain_label
-    return "META"
+def infer_domain(classification_text: str, cfg: dict) -> str:
+    return infer_label(classification_text, cfg["domain_keywords"], "META")
 
 # ---------------------------------------------------------------------------
 # Filename validation
 # ---------------------------------------------------------------------------
-FILENAME_PATTERN = re.compile(r"^[A-Z]+_[A-Z]+_\d{4}_[a-z0-9\-]+_[a-z]+\.pdf$")
+FILENAME_PATTERN = re.compile(r"^[A-Z]+_[A-Z]+_\d{4}_[a-z0-9\-]+_[a-z]+(?:_v\d+)?\.pdf$")
 
 def validate_filename(name: str) -> bool:
     return bool(FILENAME_PATTERN.match(name))
@@ -160,24 +549,46 @@ def process_file(path: Path, cfg: dict) -> dict | None:
     """Rename a PDF and write its metadata JSON. Returns metadata dict or None."""
     log.info("Processing: %s", path.name)
 
-    title, author, year = extract_pdf_metadata(path)
+    document_metadata = extract_document_metadata(path, cfg)
+    title = document_metadata["title"]
+    author = document_metadata["author"]
+    year = document_metadata["year"]
+    first_page_text = document_metadata["first_page_text"]
+    classification_text = build_classification_text(path, title, first_page_text)
     short_title = slugify(title, cfg.get("slug_word_limit", 6))
-    doc_type    = infer_type(title, cfg)
-    domain      = infer_domain(title, cfg)
+    doc_type    = infer_type(classification_text, cfg)
+    domain      = infer_domain(classification_text, cfg)
 
-    new_name    = f"{doc_type}_{domain}_{year}_{short_title}_{author}.pdf"
+    new_name = f"{doc_type}_{domain}_{year}_{short_title}_{author}.pdf"
+
+    # Enforce 100-character filename limit by trimming the slug
+    if len(new_name) > 100:
+        fixed = len(doc_type) + len(domain) + len(author) + 12
+        max_slug = max(3, 100 - fixed)
+        trimmed = short_title[:max_slug].rstrip("-")
+        new_name = f"{doc_type}_{domain}_{year}_{trimmed}_{author}.pdf"
+        log.warning("Filename trimmed to fit 100-char limit: %s", new_name)
 
     if not validate_filename(new_name):
         log.error("Generated filename failed validation: %s", new_name)
         return None
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    dest = OUTPUT_DIR / new_name
 
-    # Avoid silent overwrite
+    # Resolve duplicates: append _v2, _v3, …
+    dest = OUTPUT_DIR / new_name
     if dest.exists():
-        log.warning("Destination exists, skipping: %s", new_name)
-        return None
+        stem = Path(new_name).stem
+        for version in range(2, 100):
+            candidate = f"{stem}_v{version}.pdf"
+            dest = OUTPUT_DIR / candidate
+            if not dest.exists():
+                new_name = candidate
+                log.info("Duplicate detected — versioned as: %s", new_name)
+                break
+        else:
+            log.error("Could not find a free filename for %s", new_name)
+            return None
 
     shutil.move(str(path), str(dest))
     log.info("Renamed → %s", new_name)
@@ -188,6 +599,10 @@ def process_file(path: Path, cfg: dict) -> dict | None:
         "year":     year,
         "title":    title,
         "author":   author,
+        "authors":  document_metadata["authors"],
+        "doi":      document_metadata["doi"],
+        "abstract": document_metadata["abstract"],
+        "metadata_sources": document_metadata["metadata_sources"],
         "filename": new_name,
         "source":   str(path),
         "processed_at": datetime.utcnow().isoformat() + "Z",
