@@ -96,7 +96,14 @@ Interval is configurable in `config.yaml`.
 ## Configuration
 
 Edit `config.yaml` to add keywords for TYPE and DOMAIN inference.
-All keyword matches are case-insensitive substring checks against the PDF title.
+Matches are case-insensitive and now use normalized title, filename, and,
+when text extraction succeeds, the first PDF page.
+
+Optional metadata enrichment can also be enabled in `config.yaml`:
+
+- `grobid_url` to extract structured academic metadata from a local or remote GROBID service
+- `crossref_enabled` to resolve DOI metadata from CrossRef
+- `semantic_scholar_enabled` to backfill DOI metadata from Semantic Scholar
 
 ---
 
@@ -104,13 +111,17 @@ All keyword matches are case-insensitive substring checks against the PDF title.
 
 | Package   | Purpose                          |
 |-----------|----------------------------------|
-| PyPDF2    | PDF metadata extraction          |
+| pdfminer.six | PDF text + embedded metadata extraction |
 | PyYAML    | config.yaml parsing              |
 
 ---
 
-## Accuracy (v1)
+## Accuracy
 
-- ~70 % accurate metadata extraction from PDF headers
-- ~80 % correct TYPE/DOMAIN naming
-- Manual correction expected for noisy PDFs
+- Header-only metadata is often unreliable for noisy PDFs, ISBN-based filenames,
+  and scanned exports
+- TYPE and DOMAIN inference now uses title, filename, and first-page text to
+  reduce `PAPER_META` fallbacks
+- DOI extraction can be enriched through GROBID, CrossRef, and Semantic Scholar
+  when those services are configured or reachable
+- Manual correction can still be necessary for image-only PDFs or very sparse documents
