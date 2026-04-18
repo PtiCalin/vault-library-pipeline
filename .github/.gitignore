@@ -6,3 +6,7 @@ secrets.yaml
 
 # Generated workflow artifacts
 *.log
+
+
+# Local development files
+.claude/
