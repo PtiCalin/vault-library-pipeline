@@ -6,7 +6,17 @@ secrets.yaml
 
 # Generated workflow artifacts
 *.log
-
+/__pycache__/
+*.pyc
 
 # Local development files
-.claude
+/.claude/
+/.obsidian/
+/.vscode/
+/.venv/
+/.vs/
+/.zotero/
+
+# Drafts and notes
+/.draft/
+/.ideas/
