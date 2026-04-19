@@ -14,6 +14,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Replace PyPDF2 with `pdfminer.six` for richer text extraction and embedded PDF info parsing
 - Add optional GROBID integration for structured academic metadata enrichment
 - Add optional CrossRef and Semantic Scholar DOI lookups to backfill title, author, year, and abstract
+- Add documentation set under `docs/`: `DOMAINS.md`, `EXTRACT-METADATA.md`, `FILE-NAMING.md`, `INFERENCE-RULES.md`, `PARSE-CONTENT.md`, `TAGS.md`, and `TYPES.md`
+- Add per-folder usage guides: `library_pipeline/01_input_pdfs/INPUTS.md`, `library_pipeline/02_processed/PROCESSED.md`, `library_pipeline/03_metadata/METADATA.md`, and `library_pipeline/04_exports/EXPORTS.md`
+- Add `.github/RELEASE-TEMPLATE.md` to standardize release-note drafting
+
+### Changed
+
+- Update `README.md` to align with the new documentation structure and workflow details
+- Move changelog location from repository root to `.github/CHANGE-LOG.md`
+- Remove obsolete input template file `library_pipeline/01_input_pdfs/Conference-template-A4.docx`
 
 ---
 
