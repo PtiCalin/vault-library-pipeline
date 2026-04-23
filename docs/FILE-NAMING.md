@@ -65,12 +65,53 @@ REVIEW_COMPUTE_2024_movie-recommender-systems_ariyanto.pdf
 
 ## Contraintes de classification
 
-Chaque fichier doit avoir :
+Chaque fichier reçoit dans ses métadonnées JSON (`03_metadata/`) :
 
-- 1 TYPE
-- 1 DOMAIN primaire (dans le nom)
-- 0 a 3 domaines secondaires (en tags)
-- au moins 1 tag conceptuel
+- 1 **TYPE** (dans le nom de fichier)
+- 1 **DOMAIN primaire** (dans le nom de fichier)
+- 0–3 **DOMAIN secondaires** (dans `tags`, métadonnées JSON)
+- ≥1 **tag conceptuel** (dans `tags`, métadonnées JSON)
+
+Le nom de fichier lui-même reste stable et court :
+```txt
+TYPE_DOMAIN_YEAR_short-title-slug_author.pdf
+```
+
+Les domaines secondaires et concepts n'apparaissent qu'en **tags des notes Obsidian**, pas dans le filename.
+
+## Métadonnées enrichies (JSON)
+
+Chaque PDF traité génère un fichier JSON dans `03_metadata/` :
+
+```json
+{
+  "type": "PAPER",
+  "domain": "COMPUTE",
+  "primary_domain": "COMPUTE",
+  "secondary_domains": ["FORMAL", "HUMAN"],
+  "concept_tags": ["machine-learning", "neural-networks"],
+  "year": "2024",
+  "title": "Deep Learning for Decision Making",
+  "author": "smith",
+  "tags": ["compute", "formal", "human", "paper", "machine-learning", "neural-networks"],
+  "classification_scores": {
+    "type": [
+      { "label": "PAPER", "score": 8.5 },
+      { "label": "REPORT", "score": 2.1 }
+    ],
+    "domain": [
+      { "label": "COMPUTE", "score": 18.3 },
+      { "label": "FORMAL", "score": 6.2 },
+      { "label": "HUMAN", "score": 5.0 }
+    ]
+  }
+}
+```
+
+Champs utiles pour l'export Obsidian :
+- `primary_domain`, `secondary_domains` → pour les tags
+- `concept_tags` → pour la taxonomie manuelle
+- `classification_scores` → pour déboguer les matchs
 
 ## Règles réellement appliquées par le pipeline
 

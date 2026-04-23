@@ -3,6 +3,9 @@
 # and, when available, first-page PDF text.
 # Best-scoring key wins in each section.
 # PAPER (type) and META (domain) are built-in catch-alls — keep them last.
+# Inference supports list syntax and rich entries:
+# - "keyword"
+# - { term: "keyword", weight: 1.5, aliases: ["kw"], concepts: ["concept-tag"] }
 
 # ------------------------------------------------------------------
 # TYPE inference
@@ -11,54 +14,54 @@
 type_keywords:
 
   # Academic
-  REVIEW:       ["review", "systematic review", "literature review"]
-  SURVEY:       ["survey"]
-  META:         ["meta-analysis", "meta analysis"]
-  THESIS:       ["thesis", "mémoire"]
+  REVIEW:       ["review", "systematic review", "literature review", "state of the art review"]
+  SURVEY:       ["survey", "broad overview", "comprehensive survey"]
+  META:         ["meta-analysis", "meta analysis", "pooled effect size"]
+  THESIS:       ["thesis", "master thesis", "msc thesis", "memoire"]
   DISSERTATION: ["dissertation", "doctoral thesis", "phd thesis"]
-  PREPRINT:     ["preprint", "arxiv", "working paper"]
+  PREPRINT:     ["preprint", "arxiv", "working paper", "not peer reviewed"]
 
   # Conference / publication formats
-  PROCEEDING:   ["proceedings", "conference paper", "in proceedings"]
+  PROCEEDING:   ["proceedings", "conference paper", "in proceedings", "conference record"]
   ABSTRACT:     ["extended abstract", "abstract only"]
-  POSTER:       ["poster"]
-  TALK:         ["presentation", "slide deck", "keynote", "talk slides"]
+  POSTER:       ["poster", "research poster"]
+  TALK:         ["presentation", "slide deck", "keynote", "talk slides", "lecture slides"]
 
   # Books & long-form
   BOOK:         ["handbook", "textbook", "introduction to", "guide to",
-                  "principles of", "foundations of"]
+                  "principles of", "foundations of", "second edition", "third edition"]
   CHAPTER:      ["chapter"]
-  MONOGRAPH:    ["monograph"]
+  MONOGRAPH:    ["monograph", "specialized monograph"]
 
   # Technical / industry / grey literature
-  REPORT:       ["report", "technical report"]
-  WHITEPAPER:   ["white paper", "whitepaper", "position paper"]
+  REPORT:       ["report", "technical report", "institutional report", "industry report"]
+  WHITEPAPER:   ["white paper", "whitepaper", "position paper", "technology whitepaper"]
   STANDARD:     ["iso standard", "rfc", "w3c recommendation", "ieee standard"]
-  SPEC:         ["specification", "api spec", "technical specification"]
-  DOC:          ["documentation", "reference manual", "user manual"]
+  SPEC:         ["specification", "api spec", "technical specification", "protocol spec"]
+  DOC:          ["documentation", "reference manual", "user manual", "developer documentation"]
 
   # Educational / explanatory
-  TUTORIAL:     ["tutorial", "step-by-step guide"]
+  TUTORIAL:     ["tutorial", "step-by-step guide", "walkthrough"]
   GUIDE:        ["guide", "how-to", "best practices"]
-  COURSE:       ["course material", "lecture notes", "lecture series"]
+  COURSE:       ["course material", "lecture notes", "lecture series", "syllabus"]
   NOTE:         ["reading notes", "field notes", "informal notes"]
 
   # Data / code / artifacts
-  DATASET:      ["dataset", "data collection", "corpus"]
-  BENCHMARK:    ["benchmark", "evaluation dataset", "leaderboard"]
-  CODE:         ["implementation", "codebase", "repository reference"]
-  MODEL:        ["model architecture", "pretrained model", "model card"]
+  DATASET:      ["dataset", "data collection", "corpus", "benchmark dataset"]
+  BENCHMARK:    ["benchmark", "evaluation dataset", "leaderboard", "benchmark suite"]
+  CODE:         ["implementation", "codebase", "repository reference", "github repository"]
+  MODEL:        ["model architecture", "pretrained model", "model card", "checkpoint"]
 
   # Media / communication
-  ARTICLE:      ["magazine article", "editorial", "op-ed"]
+  ARTICLE:      ["magazine article", "editorial", "op-ed", "feature article"]
   BLOG:         ["blog post", "blog"]
   NEWS:         ["news article", "press release"]
-  INTERVIEW:    ["interview", "q&a", "discussion transcript"]
+  INTERVIEW:    ["interview", "q&a", "discussion transcript", "panel discussion"]
 
   # Legal / policy
-  POLICY:       ["policy document", "governance document", "framework document"]
-  LAW:          ["legal text", "statute", "legislation"]
-  REGULATION:   ["regulation", "regulatory document", "directive"]
+  POLICY:       ["policy document", "governance document", "framework document", "public policy"]
+  LAW:          ["legal text", "statute", "legislation", "legal code"]
+  REGULATION:   ["regulation", "regulatory document", "directive", "compliance requirement"]
 
   # Catch-all — always last
   PAPER:        []
@@ -70,57 +73,131 @@ type_keywords:
 # ------------------------------------------------------------------
 domain_keywords:
 
-  FORMAL:      ["mathematics", "mathematical", "logic", "statistics",
-                "statistical", "optimization", "algebra", "topology",
-                "probability", "calculus", "combinatorics", "formal methods",
-                "symbolic"]
+  FORMAL:
+    - { term: "mathematics", aliases: ["mathematical"], concepts: ["math"] }
+    - { term: "statistics", aliases: ["statistical", "statistical inference"], concepts: ["stats"] }
+    - { term: "logic", aliases: ["formal logic"], concepts: ["logic"] }
+    - { term: "optimization", aliases: ["mathematical optimization"], concepts: ["optimization"] }
+    - { term: "probability", concepts: ["probability"] }
+    - { term: "formal methods", concepts: ["formal-methods"] }
+    - "algebra"
+    - "calculus"
+    - "combinatorics"
 
-  COMPUTE:     ["algorithm", "machine learning", "deep learning",
-                "neural network", "recommendation system", "natural language",
-                "nlp", "computer vision", "artificial intelligence",
-                "transformer", "large language model", "llm", "generative ai",
-                "software engineering", "database", "distributed system",
-                "network security", "cybersecurity", "cyber security",
-                "infosec", "information security", "computer security",
-                "malware", "spyware", "trojan", "ransomware", "phishing",
-                "attack", "attacks", "exploit", "exploits", "zero click",
-                "zeroclick", "zero-click", "sandbox", "android", "ios",
-                "mobile security", "threat detection", "threat intelligence",
-                "forensics", "reverse engineering", "vulnerability",
-                "vulnerabilities", "blockchain", "computing"]
+  COMPUTE:
+    - { term: "machine learning", aliases: ["ml"], weight: 1.4, concepts: ["ml"] }
+    - { term: "artificial intelligence", aliases: ["ai"], weight: 1.4, concepts: ["ai"] }
+    - { term: "deep learning", concepts: ["deep-learning"] }
+    - { term: "large language model", aliases: ["llm", "foundation model"], concepts: ["llm"] }
+    - { term: "recommendation system", aliases: ["recommender system", "recsys"], concepts: ["recsys"] }
+    - { term: "natural language processing", aliases: ["nlp"], concepts: ["nlp"] }
+    - { term: "computer vision", aliases: ["vision model"], concepts: ["computer-vision"] }
+    - { term: "software engineering", aliases: ["software architecture"], concepts: ["software-engineering"] }
+    - { term: "database", aliases: ["dbms"], concepts: ["database"] }
+    - { term: "distributed system", aliases: ["distributed systems"], concepts: ["distributed-systems"] }
+    - { term: "cybersecurity", aliases: ["cyber security", "infosec", "computer security"], concepts: ["security"] }
+    - { term: "malware", aliases: ["spyware", "ransomware", "trojan"], concepts: ["malware"] }
+    - { term: "vulnerability", aliases: ["exploit", "zero click", "zero-click", "zeroclick"], concepts: ["vulnerability"] }
+    - { term: "mobile security", aliases: ["android security", "ios security"], concepts: ["mobile-security"] }
+    - { term: "forensics", aliases: ["reverse engineering"], concepts: ["forensics"] }
+    - { term: "network security", concepts: ["network-security"] }
+    - { term: "blockchain", concepts: ["blockchain"] }
+    - "algorithm"
+    - "computing"
 
-  NATURE:      ["biology", "genomics", "protein", "cell biology", "genetics",
-                "gene", "bioinformatics", "ecology", "physics", "chemistry",
-                "molecule", "quantum", "particle physics", "medicine",
-                "pharmacology", "astrophysics", "neurobiology", "molecular"]
+  NATURE:
+    - { term: "biology", aliases: ["cell biology", "molecular biology"], concepts: ["biology"] }
+    - { term: "genomics", aliases: ["genetics"], concepts: ["genomics"] }
+    - { term: "bioinformatics", concepts: ["bioinformatics"] }
+    - { term: "medicine", aliases: ["clinical", "medical"], concepts: ["medicine"] }
+    - { term: "physics", aliases: ["particle physics"], concepts: ["physics"] }
+    - { term: "chemistry", aliases: ["chemical"], concepts: ["chemistry"] }
+    - { term: "ecology", concepts: ["ecology"] }
+    - "quantum"
+    - "protein"
+    - "molecule"
 
-  HUMAN:       ["psychology", "cognitive science", "cognition", "neuroscience",
-                "human behavior", "perception", "decision making",
-                "behavioral science", "mental health"]
+  HUMAN:
+    - { term: "psychology", aliases: ["behavioral science"], concepts: ["psychology"] }
+    - { term: "cognitive science", aliases: ["cognition"], concepts: ["cognition"] }
+    - { term: "neuroscience", aliases: ["neuro"], concepts: ["neuroscience"] }
+    - { term: "human behavior", aliases: ["behaviour", "behavior"], concepts: ["behavior"] }
+    - { term: "decision making", aliases: ["decision-making"], concepts: ["decision-making"] }
+    - "perception"
+    - "mental health"
 
-  SOCIAL:      ["sociology", "economics", "political science", "politics",
-                "governance", "public policy", "anthropology", "organization",
-                "social science", "international relations"]
+  SOCIAL:
+    - { term: "sociology", concepts: ["sociology"] }
+    - { term: "economics", aliases: ["economic"], concepts: ["economics"] }
+    - { term: "political science", aliases: ["politics"], concepts: ["politics"] }
+    - { term: "governance", aliases: ["public policy"], concepts: ["governance"] }
+    - { term: "organization", aliases: ["organizational"], concepts: ["organization"] }
+    - { term: "social science", concepts: ["social-science"] }
+    - "anthropology"
+    - "international relations"
 
-  CULTURE:     ["art history", "musicology", "cinema studies", "film studies",
-                "literary", "philosophy", "religion", "ethics", "aesthetics",
-                "cultural studies", "media studies"]
+  CULTURE:
+    - { term: "art history", aliases: ["visual arts"], concepts: ["art"] }
+    - { term: "musicology", aliases: ["music studies"], concepts: ["music"] }
+    - { term: "cinema studies", aliases: ["film studies"], concepts: ["cinema"] }
+    - { term: "literature", aliases: ["literary"], concepts: ["literature"] }
+    - { term: "philosophy", concepts: ["philosophy"] }
+    - { term: "religion", concepts: ["religion"] }
+    - { term: "cultural studies", concepts: ["culture"] }
+    - "ethics"
+    - "aesthetics"
 
-  DESIGN:      ["ux design", "user experience", "product design",
-                "interaction design", "architecture", "urban design",
-                "systems thinking", "design thinking", "graphic design"]
+  DESIGN:
+    - { term: "ux design", aliases: ["user experience", "ux"], concepts: ["ux"] }
+    - { term: "product design", concepts: ["product-design"] }
+    - { term: "interaction design", concepts: ["interaction-design"] }
+    - { term: "architecture", aliases: ["urban design"], concepts: ["architecture"] }
+    - { term: "systems thinking", aliases: ["design thinking"], concepts: ["systems-thinking"] }
+    - "graphic design"
 
-  ENGINEERING: ["infrastructure", "hardware", "energy systems",
-                "systems engineering", "applied engineering", "civil engineering",
-                "mechanical engineering", "electrical engineering"]
+  ENGINEERING:
+    - { term: "systems engineering", concepts: ["systems-engineering"] }
+    - { term: "infrastructure", aliases: ["infrastructure engineering"], concepts: ["infrastructure"] }
+    - { term: "hardware", aliases: ["embedded hardware"], concepts: ["hardware"] }
+    - { term: "energy systems", aliases: ["energy engineering"], concepts: ["energy"] }
+    - "civil engineering"
+    - "mechanical engineering"
+    - "electrical engineering"
+
+  META:
+    - { term: "research methods", aliases: ["methodology"], concepts: ["research-methods"] }
+    - { term: "learning science", aliases: ["learning systems"], concepts: ["learning"] }
+    - { term: "epistemology", concepts: ["epistemology"] }
+    - { term: "classification", aliases: ["taxonomy"], concepts: ["classification"] }
 
   # Catch-all — always last
-  META:        []
+  # Leave META above with explicit terms; fallback is still handled in code.
 
 # ------------------------------------------------------------------
 # Slugification
 # ------------------------------------------------------------------
 slug_word_limit: 6     # max keywords kept from the title (3–6 recommended)
+
+# ------------------------------------------------------------------
+# Classification tuning (weighted fuzzy scoring)
+# ------------------------------------------------------------------
+classification:
+  field_weights:
+    title: 3.0
+    filename: 2.0
+    first_page: 1.5
+    abstract: 1.2
+  fuzzy:
+    enabled: true
+    threshold: 0.88
+    partial_threshold: 0.92
+    fuzzy_boost: 0.7
+  secondary_domains:
+    max_count: 3
+    min_relative_score: 0.35
+  concept_tags:
+    min_count: 1
+    fallback: general
 
 # ------------------------------------------------------------------
 # Metadata enrichment
