@@ -1,2 +1,2 @@
-pdfminer.six>=20231228
+pdfminer.six>=20260107
 PyYAML>=6.0
